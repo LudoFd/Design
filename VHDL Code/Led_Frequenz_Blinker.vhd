@@ -11,17 +11,27 @@ use ieee.numeric_std.all;
 
 
 entity Led_blink_control is
+		generic(
+			c_dbounce_max: integer:= 2500000;	-- 100 ms 5000000
+			reset_max: integer:= 12500000;		-- 500 ms = 25000000
+			sys_rst_puffer: integer:=  6250000; -- 250 ms =  12500000
+			
+			for_1_hz:   integer:= 25000000;		-- 1hz   =>     1s = 50000000
+			for_2_hz:   integer:= 12500000;		-- 2hz   =>   0.5s = 25000000 clock cycles
+			for_5_hz:   integer:= 5000000;		-- 5hz   =>   0.2s = 10000000 clock cycles
+			for_10_hz:  integer:=  2500000);	-- 10hz  =>   0.1s = 5000000 clock cycles
+
 	port(
-		i_Clk: in std_logic;
-		sw1: in std_logic;
-		sw2: in std_logic;
-		sw3: in std_logic;
-		sw4: in std_logic;
+		i_Clk: in std_logic;	-- Pin E1
+		sw1: in std_logic;      -- Pin M15
+		sw2: in std_logic;      -- Pin M16
+		sw3: in std_logic;      -- Pin E16
+		sw4: in std_logic;		-- Pin E15
 		
-		d1: out std_logic;
-		d2: out std_logic;
-		d3: out std_logic;
-		d4: out std_logic);
+		d1: out std_logic;	-- Pin R16
+		d2: out std_logic;	-- Pin P16
+		d3: out std_logic;	-- Pin N15
+		d4: out std_logic);	-- Pin N16
 	
 end entity;
 
@@ -38,29 +48,15 @@ signal  r_sw1_dbounce,r_sw2_dbounce,
 signal  r_sw1_sync,r_sw2_sync,
 		r_sw3_sync,r_sw4_sync: std_logic_vector(1 downto 0):="00";
 		
-constant c_dbounce_max: integer:= 125000;	-- 5ms = 125.000 clock cycle
 signal r_sw1_dbounce_counter: integer range 0 to c_dbounce_max:=0;
 signal r_sw2_dbounce_counter: integer range 0 to c_dbounce_max:=0;
 signal r_sw3_dbounce_counter: integer range 0 to c_dbounce_max:=0;
 signal r_sw4_dbounce_counter: integer range 0 to c_dbounce_max:=0;
 
-
-constant reset_max: integer:= 12500000;	-- 500 ms = 12.500.000 clock cycles
-constant sys_rst_puffer: integer:=  6250000; -- 250 ms =  6.250.000 clock cycles
 signal r_sw1_reset_counter:   integer range 0 to reset_max:=0;
 signal r_sw2_reset_counter:   integer range 0 to reset_max:=0;
 signal r_sw3_reset_counter:   integer range 0 to reset_max:=0;
 signal r_sw4_reset_counter:   integer range 0 to reset_max:=0;
-signal sw1_sys_reset_counter: integer range 0 to sys_rst_puffer:= sys_rst_puffer;
-signal sw2_sys_reset_counter: integer range 0 to sys_rst_puffer:= sys_rst_puffer;
-
-type state is (led1_passive,led2_passive,led3_passive,led4_passive,
-			   led1_active,led2_active,led3_active,led4_active);
-			   
-signal led1_state: state:= led1_passive;
-signal led2_state: state:= led2_passive; 
-signal led3_state: state:= led3_passive;
-signal led4_state: state:= led4_passive; 
 
 
 signal sys_reset: std_logic:='0';
@@ -70,56 +66,17 @@ signal sw3_reset: std_logic:='0';
 signal sw4_reset: std_logic:='0';
 signal pre_sys_reset: std_logic:= '0';
 
-
-constant for_1_hz:   integer:= 25000000;	-- 1hz   =>     1s = 25.000.000 clock cycles
-constant for_2_hz:   integer:= 12500000;	-- 2hz   =>   0.5s = 12.500.000 clock cycles
-constant for_5_hz:   integer:=  5000000;	-- 5hz   =>   0.2s =  5.000.000 clock cycles
-constant for_10_hz:  integer:=  2500000;	-- 10hz  =>   0.1s =  2.500.000 clock cycles
---constant for_20_hz:  integer:= 1250000;	-- 20hz  =>  0.05s =  1.250.000 clock cycles
---constant for_50_hz:  integer:=  500000;	-- 50hz  =>  0.02s =    500.000 clock cycles
---constant for_100_hz: integer:=  250000;	-- 100hz =>  0.01s =    250.000 clock cycles
-
-signal sw1_blink_counter_max: integer:= for_1_hz;
-signal sw2_blink_counter_max: integer:= for_1_hz;
-signal sw3_blink_counter_max: integer:= for_1_hz;
-signal sw4_blink_counter_max: integer:= for_1_hz;
+signal sw1_blink_counter_max: integer:= 0;	--for_1_hz;
+signal sw2_blink_counter_max: integer:= 0;	--for_1_hz;
+signal sw3_blink_counter_max: integer:= 0;	--for_1_hz;  
+signal sw4_blink_counter_max: integer:= 0;	--for_1_hz;
 
 signal sw1_blink_counter:   integer range 0 to for_1_hz;
 signal sw2_blink_counter:   integer range 0 to for_1_hz;
 signal sw3_blink_counter:   integer range 0 to for_1_hz;
 signal sw4_blink_counter:   integer range 0 to for_1_hz;
 						  
---signal sw1_2hz_counter:   integer range 0 to for_2_hz;
---signal sw2_2hz_counter:   integer range 0 to for_2_hz;
---signal sw3_2hz_counter:   integer range 0 to for_2_hz;
---signal sw4_2hz_counter:   integer range 0 to for_2_hz;
---						  
---signal sw1_5hz_counter:   integer range 0 to for_5_hz;
---signal sw2_5hz_counter:   integer range 0 to for_5_hz;
---signal sw3_5hz_counter:   integer range 0 to for_5_hz;
---signal sw4_5hz_counter:   integer range 0 to for_5_hz;
---
---signal sw1_10hz_counter:  integer range 0 to for_10_hz;
---signal sw2_10hz_counter:  integer range 0 to for_10_hz;
---signal sw3_10hz_counter:  integer range 0 to for_10_hz;
---signal sw4_10hz_counter:  integer range 0 to for_10_hz;
-
---signal sw1_20hz_counter:  integer range 0 to for_20_hz;
---signal sw2_20hz_counter:  integer range 0 to for_20_hz;
---signal sw3_20hz_counter:  integer range 0 to for_20_hz;
---signal sw4_20hz_counter:  integer range 0 to for_20_hz;
---						  
---signal sw1_50hz_counter:  integer range 0 to for_50_hz;
---signal sw2_50hz_counter:  integer range 0 to for_50_hz;
---signal sw3_50hz_counter:  integer range 0 to for_50_hz;
---signal sw4_50hz_counter:  integer range 0 to for_50_hz;
---
---signal sw1_100hz_counter: integer range 0 to for_100_hz;
---signal sw2_100hz_counter: integer range 0 to for_100_hz;
---signal sw3_100hz_counter: integer range 0 to for_100_hz;
---signal sw4_100hz_counter: integer range 0 to for_100_hz;
-
-signal sw1_shift,sw2_shift,sw3_shift,sw4_shift: std_logic_vector(2 downto 0):="000";
+signal sw1_shift,sw2_shift,sw3_shift,sw4_shift: natural range 0 to 4;
 
 begin
 
@@ -294,246 +251,213 @@ begin
 
 end process Reset_Signals;
 
-FSM_transition: process(i_Clk)
+
+Control_Blinking_Freq_LED1: process(i_Clk)
 begin
+
 	if rising_edge(i_Clk) then
 	
-		if sys_reset = '1' then
-			led1_state <= led1_passive;
-			led2_state <= led2_passive;
-			led3_state <= led3_passive;
-			led4_state <= led4_passive;
-		
-		else
-		
-			if sw1_reset = '1' then
-				led1_state <= led1_passive;
-				
-			elsif led1_state = led1_passive and (r_sw1_dbounce = '0' and r_sw1_delayed = '1') then -- if no reset occurs and fallinge edge is detected 
-				led1_state <= led1_active;
-			end if;
-				
-			if sw2_reset = '1' then
-				led2_state <= led2_passive;
-				
-			elsif led2_state = led2_passive and (r_sw2_dbounce = '0' and r_sw2_delayed = '1') then -- if no reset occurs and fallinge edge is detected 
-				led2_state <= led2_active; 
-			end if;
-				
-			if sw3_reset = '1' then
-				led3_state <= led3_passive;
-
-			elsif led3_state = led3_passive and (r_sw3_dbounce = '0' and r_sw3_delayed = '1') then -- if no reset occurs and fallinge edge is detected
-				led3_state <= led3_active;
-			end if;
+		if sys_reset = '1' or sw1_reset = '1' then
+			sw1_shift <= 0;
 			
-			if sw4_reset = '1' then
-				led4_state <= led4_passive;
-				
-			elsif led4_state = led4_passive and (r_sw4_dbounce = '0' and r_sw4_delayed = '1') then -- if no reset occurs and fallinge edge is detected 
-				led4_state <= led4_active;
-			end if;
-		
+		elsif sw1_shift = 0 and r_sw1_dbounce = '0' and r_sw1_delayed = '1' then
+			sw1_shift <= sw1_shift + 1;
+			sw1_blink_counter_max <= for_1_hz;
+			
+		elsif sw1_shift = 1 and r_sw1_dbounce = '0' and r_sw1_delayed = '1' then
+			sw1_shift <= sw1_shift + 1;
+			sw1_blink_counter_max <= for_2_hz;
+			
+		elsif sw1_shift = 2 and r_sw1_dbounce = '0' and r_sw1_delayed = '1' then
+			sw1_shift <= sw1_shift + 1;
+			sw1_blink_counter_max <= for_5_hz;
+			
+		elsif sw1_shift = 3 and r_sw1_dbounce = '0' and r_sw1_delayed = '1' then
+			sw1_shift <= sw1_shift + 1;
+			sw1_blink_counter_max <= for_10_hz;
+			
+		elsif sw1_shift = 4 and r_sw1_dbounce = '0' and r_sw1_delayed = '1' then
+			sw1_shift <= 0;
+			sw1_blink_counter_max <= 0;
+			
 		end if;
+	
 	end if;
 
-end process FSM_transition;
+end process Control_Blinking_Freq_LED1;
 
 
-
-FSM: process(i_Clk)
+Control_Blinking_Freq_LED2: process(i_Clk)
 begin
+
+	if rising_edge(i_Clk) then
+	
+		if sys_reset = '1' or sw2_reset = '1' then
+			sw2_shift <= 0;
+	
+		elsif sw2_shift = 0 and r_sw2_dbounce = '0' and r_sw2_delayed = '1' then
+			sw2_shift <= sw2_shift + 1;
+			sw2_blink_counter_max <= for_1_hz;
+			
+		elsif sw2_shift = 1 and r_sw2_dbounce = '0' and r_sw2_delayed = '1' then
+			sw2_shift <= sw2_shift + 1;
+			sw2_blink_counter_max <= for_2_hz;
+			
+		elsif sw2_shift = 2 and r_sw2_dbounce = '0' and r_sw2_delayed = '1' then
+			sw2_shift <= sw2_shift + 1;
+			sw2_blink_counter_max <= for_5_hz;
+			
+		elsif sw2_shift = 3 and r_sw2_dbounce = '0' and r_sw2_delayed = '1' then
+			sw2_shift <= sw2_shift + 1;
+			sw2_blink_counter_max <= for_10_hz;
+			
+		elsif sw2_shift = 4 and r_sw2_dbounce = '0' and r_sw2_delayed = '1' then
+			sw2_shift <= 0;
+			sw2_blink_counter_max <= 0;
+			
+		end if;
+	
+	end if;
+
+
+end process Control_Blinking_Freq_LED2;
+
+
+Control_Blinking_Freq_LED3: process(i_Clk)
+begin
+
+	if rising_edge(i_Clk) then
+	
+		if sys_reset = '1' or sw3_reset = '1' then
+			sw3_shift <= 0;
+	
+		elsif sw3_shift = 0 and r_sw3_dbounce = '0' and r_sw3_delayed = '1' then
+			sw3_shift <= sw3_shift + 1;
+			sw3_blink_counter_max <= for_1_hz;
+			
+		elsif sw3_shift = 1 and r_sw3_dbounce = '0' and r_sw3_delayed = '1' then
+			sw3_shift <= sw3_shift + 1;
+			sw3_blink_counter_max <= for_2_hz;
+			
+		elsif sw3_shift = 2 and r_sw3_dbounce = '0' and r_sw3_delayed = '1' then
+			sw3_shift <= sw3_shift + 1;
+			sw3_blink_counter_max <= for_5_hz;
+			
+		elsif sw3_shift = 3 and r_sw3_dbounce = '0' and r_sw3_delayed = '1' then
+			sw3_shift <= sw3_shift + 1;
+			sw3_blink_counter_max <= for_10_hz;
+			
+		elsif sw3_shift = 4 and r_sw3_dbounce = '0' and r_sw3_delayed = '1' then
+			sw3_shift <= 0;
+			sw3_blink_counter_max <= 0;
+			
+		end if;
+	
+	end if;
+
+
+end process Control_Blinking_Freq_LED3;
+
+
+Control_Blinking_Freq_LED4: process(i_Clk)
+begin
+
+	if rising_edge(i_Clk) then
+	
+		if sys_reset = '1' or sw4_reset = '1' then
+			sw4_shift <= 0;
+	
+		elsif sw4_shift = 0 and r_sw4_dbounce = '0' and r_sw4_delayed = '1' then
+			sw4_shift <= sw4_shift + 1;
+			sw4_blink_counter_max <= for_1_hz;
+			
+		elsif sw4_shift = 1 and r_sw4_dbounce = '0' and r_sw4_delayed = '1' then
+			sw4_shift <= sw4_shift + 1;
+			sw4_blink_counter_max <= for_2_hz;
+			
+		elsif sw4_shift = 2 and r_sw4_dbounce = '0' and r_sw4_delayed = '1' then
+			sw4_shift <= sw4_shift + 1;
+			sw4_blink_counter_max <= for_5_hz;
+			
+		elsif sw4_shift = 3 and r_sw4_dbounce = '0' and r_sw4_delayed = '1' then
+			sw4_shift <= sw4_shift + 1;
+			sw4_blink_counter_max <= for_10_hz;
+			
+		elsif sw4_shift = 4 and r_sw4_dbounce = '0' and r_sw4_delayed = '1' then
+			sw4_shift <= 0;
+			sw4_blink_counter_max <= 0;
+			
+		end if;
+	
+	end if;
+
+
+end process Control_Blinking_Freq_LED4;
+
+
+Blinking: process(i_Clk)
+begin
+
 	if rising_edge(i_Clk) then
 		
-		case led1_state is
+		if sys_reset = '1' or  sw1_reset = '1' or sw1_shift = 0 then
+			led1 <= '0';
+			sw1_blink_counter <= 0;
+		
+		elsif sw1_blink_counter = sw1_blink_counter_max -1 then
+			led1 <= not led1;
+			sw1_blink_counter <= 0;
 			
-			when led1_passive =>
-				sw1_blink_counter  <= 0;
-				led1 <= '0';
-				sw1_blink_counter_max <= for_1_hz;
-				sw1_shift <= (others => '0');
-				
-			when led1_active =>
-			
-				if (r_sw1_dbounce = '0' and r_sw1_delayed = '1') or 
-				   (sw1_blink_counter = sw1_blink_counter_max - 1) then	-- reset Counter eacht time a falling edge is detected
-					sw1_blink_counter <= 0;
-					
-				else
-					sw1_blink_counter <= sw1_blink_counter + 1;
-					
-				end if;
-				
-				if r_sw1_dbounce = '0' and r_sw1_delayed = '1' and sw1_shift = "111" then	-- if sw1 was already pressed 3 times, newly pressing sw1 
-					sw1_blink_counter_max <= for_1_hz;										-- another time reinitialised the blinking freq to 1hz 
-					sw1_shift <= "000";
-					
-				elsif r_sw1_dbounce = '0' and r_sw1_delayed = '1' and sw1_shift = "000" then -- switch has been pressed 1x  
-					sw1_blink_counter_max <= for_2_hz;												
-					sw1_shift <= sw1_shift(1 downto 0) & '1';				
-									
-				elsif r_sw1_dbounce = '0' and r_sw1_delayed = '1' and sw1_shift = "001" then -- switch has benn pressed 2x	
-					sw1_blink_counter_max <= for_5_hz;
-					sw1_shift <= sw1_shift(1 downto 0) & '1';
-					
-				elsif r_sw1_dbounce = '0' and r_sw1_delayed = '1' and sw1_shift = "011" then -- switch has benn pressed 3x	
-					sw1_blink_counter_max <= for_10_hz;
-					sw1_shift <= sw1_shift(1 downto 0) & '1';		
-				
-				end if;	
-				
-				if sw1_blink_counter = sw1_blink_counter_max - 1 then
-					led1 <= not led1;
-									
-				end if;
-						
-			when others =>
-				null;
-		end case;
+		else 
+			sw1_blink_counter <= sw1_blink_counter + 1;
+		
+		end if;
 		
 		
-		case led2_state is
+		if sys_reset = '1' or  sw2_reset = '1' or sw2_shift = 0  then
+			led2 <= '0';
+			sw2_blink_counter <= 0;
 			
-			when led2_passive =>
-				sw2_blink_counter  <= 0;
-				led2 <= '0';
-				sw2_blink_counter_max <= for_1_hz;
-				sw2_shift <= (others => '0');
+		elsif sw2_blink_counter = sw2_blink_counter_max -1 then
+			led2 <= not led2;
+			sw2_blink_counter <= 0;
 			
-			when led2_active =>
-			
-				if (r_sw2_dbounce = '0' and r_sw2_delayed = '1') or 
-				   (sw2_blink_counter = sw2_blink_counter_max - 1) then	-- reset Counter eacht time a falling edge is detected
-					sw2_blink_counter <= 0;
-					
-				else
-					sw2_blink_counter <= sw2_blink_counter + 1;
-					
-				end if;
-				
-				if r_sw2_dbounce = '0' and r_sw2_delayed = '1' and sw2_shift = "111" then	-- if sw2 was already pressed 3 times, newly pressing sw1 
-					sw2_blink_counter_max <= for_1_hz;										-- another time reinitialised the blinking freq to 1hz 
-					sw2_shift <= "000";
-					
-				elsif r_sw2_dbounce = '0' and r_sw2_delayed = '1' and sw2_shift = "000" then -- switch has been pressed 1x  
-					sw2_blink_counter_max <= for_2_hz;												
-					sw2_shift <= sw2_shift(1 downto 0) & '1';				
-									
-				elsif r_sw2_dbounce = '0' and r_sw2_delayed = '1' and sw2_shift = "001" then -- switch has benn pressed 2x	
-					sw2_blink_counter_max <= for_5_hz;
-					sw2_shift <= sw2_shift(1 downto 0) & '1';
-					
-				elsif r_sw2_dbounce = '0' and r_sw2_delayed = '1' and sw2_shift = "011" then -- switch has benn pressed 3x	
-					sw2_blink_counter_max <= for_10_hz;
-					sw2_shift <= sw1_shift(1 downto 0) & '1';		
-				
-				end if;	
-				
-				if sw2_blink_counter = sw2_blink_counter_max - 1 then
-					led2 <= not led2;
-									
-				end if;
-				
-			when others =>
-				null;
-		end case;
+		else 
+			sw2_blink_counter <= sw2_blink_counter + 1;
 		
+		end if;
 		
-		case led3_state is
+
+		if sys_reset = '1' or  sw3_reset = '1' or sw3_shift = 0  then
+			led3 <= '0';
+			sw3_blink_counter <= 0;
 			
-			when led3_passive =>
-				sw3_blink_counter  <= 0;
-				led3 <= '0';
-				sw3_blink_counter_max <= for_1_hz;
-				sw3_shift <= (others => '0');
-				
-			when led3_active =>
+		elsif sw3_blink_counter = sw3_blink_counter_max -1 then
+			led3 <= not led3;
+			sw3_blink_counter <= 0;
 			
-				if (r_sw3_dbounce = '0' and r_sw3_delayed = '1') or 
-				   (sw3_blink_counter = sw3_blink_counter_max - 1) then	-- reset Counter eacht time a falling edge is detected
-					sw3_blink_counter <= 0;
-					
-				else
-					sw3_blink_counter <= sw3_blink_counter + 1;
-					
-				end if;
-				
-				if r_sw3_dbounce = '0' and r_sw3_delayed = '1' and sw3_shift = "111" then	-- if sw3 was already pressed 3 times, newly pressing sw1 
-					sw3_blink_counter_max <= for_1_hz;										-- another time reinitialised the blinking freq to 1hz 
-					sw3_shift <= "000";
-					
-				elsif r_sw3_dbounce = '0' and r_sw3_delayed = '1' and sw3_shift = "000" then -- switch has been pressed 1x  
-					sw3_blink_counter_max <= for_2_hz;												
-					sw3_shift <= sw3_shift(1 downto 0) & '1';				
-									
-				elsif r_sw3_dbounce = '0' and r_sw3_delayed = '1' and sw3_shift = "001" then -- switch has benn pressed 2x	
-					sw3_blink_counter_max <= for_5_hz;
-					sw3_shift <= sw3_shift(1 downto 0) & '1';
-					
-				elsif r_sw3_dbounce = '0' and r_sw3_delayed = '1' and sw3_shift = "011" then -- switch has benn pressed 3x	
-					sw3_blink_counter_max <= for_10_hz;
-					sw3_shift <= sw3_shift(1 downto 0) & '1';		
-				
-				end if;	
-				
-				if sw3_blink_counter = sw3_blink_counter_max - 1 then
-					led3 <= not led3;
-									
-				end if;
-				
-			when	 others =>
-				null;
-		end case;
+		else 
+			sw3_blink_counter <= sw3_blink_counter + 1;
 		
+		end if;
 		
-		case led4_state is
+
+		if sys_reset = '1' or  sw4_reset = '1' or sw4_shift = 0 then
+			led4 <= '0';
+			sw4_blink_counter <= 0;
 			
-			when led4_passive =>
-				sw4_blink_counter  <= 0;
-				led4 <= '0';
-				sw4_blink_counter_max <= for_1_hz;
-				sw4_shift <= (others => '0');
-				
-			when led4_active =>
+		elsif sw4_blink_counter = sw4_blink_counter_max -1 then
+			led4 <= not led4;
+			sw4_blink_counter <= 0;
 			
-				if (r_sw4_dbounce = '0' and r_sw4_delayed = '1') or 
-				   (sw4_blink_counter = sw4_blink_counter_max - 1) then	-- reset Counter eacht time a falling edge is detected
-					sw4_blink_counter <= 0;
-					
-				else
-					sw4_blink_counter <= sw4_blink_counter + 1;
-					
-				end if;
-				
-				if r_sw4_dbounce = '0' and r_sw4_delayed = '1' and sw4_shift = "111" then	-- if sw1 was already pressed 3 times, newly pressing sw1 
-					sw4_blink_counter_max <= for_1_hz;										-- another time reinitialised the blinking freq to 1hz 
-					sw4_shift <= "000";
-					
-				elsif r_sw4_dbounce = '0' and r_sw4_delayed = '1' and sw4_shift = "000" then -- switch has been pressed 1x  
-					sw4_blink_counter_max <= for_2_hz;												
-					sw4_shift <= sw4_shift(1 downto 0) & '1';				
-									
-				elsif r_sw4_dbounce = '0' and r_sw4_delayed = '1' and sw4_shift = "001" then -- switch has benn pressed 2x	
-					sw4_blink_counter_max <= for_5_hz;
-					sw4_shift <= sw4_shift(1 downto 0) & '1';
-					
-				elsif r_sw4_dbounce = '0' and r_sw4_delayed = '1' and sw4_shift = "011" then -- switch has benn pressed 3x	
-					sw4_blink_counter_max <= for_10_hz;
-					sw4_shift <= sw4_shift(1 downto 0) & '1';		
-				
-				end if;	
-				
-				if sw4_blink_counter = sw4_blink_counter_max - 1 then
-					led4 <= not led4;
-									
-				end if;
-			    	
-			when others =>
-				null;
-		end case;
+		else 
+			sw4_blink_counter <= sw4_blink_counter + 1;
+		
+		end if;
 		
 	end if;
-end process FSM;
+end process Blinking;
+
 
 d1 <= led1;
 d2 <= led2;
