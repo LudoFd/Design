@@ -1,0 +1,337 @@
+--This design implements a module to test the function of a VGA Monitor 
+-- connected to the VGA Interface of the Go Board. It has different Module:
+-- (1): A Debounce Unit for Debounncing the reset signal since this in realised  
+-- 		by touching a switch on the Go Board for more than 500 ms.
+--
+-- (2): A UART Receiver Module which interacts with the PC Keyboard over Tera Term.
+--		Over the Keyboard the user may select whicht Pattern to be used for a test
+--
+-- (3): A UART Transmitter to trasmit back to the Tera Term the received Byte.
+--
+-- (4 & 5): Binary 2 Seven Segment Display modules which displays on the both GoBoard's 
+-- 			Seven Segment Displays the received Byte as another mechanism for control.
+--
+-- (6): A Pulse Generator to generate the HSync and VSync Signal for VGA.
+--
+-- (7): A Counter module determinating based on the HSync and VSync Signal the actual
+--		position on the monitor in term of Row and Column Position.
+--
+-- (8): A Test Pattern Generator generating Test pattern to be displayed on the monitor
+--		under Test. The User select the Pattern to be used by  pressing the corresponding
+--		number on the PC Keyboard.
+--
+-- (9): A VGA Sync Proch Modul to incoporate in the generated Vsnch and Hsync Signal the 
+-- 		recquired Front and Back Porch part.
+
+
+
+Library ieee;
+Library Module;
+use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
+
+
+entity VGA_Monitor_Test is
+	generic(
+		NbrBits4RGB: natural:= 3;
+		
+		FrontPorch_Hor: natural:= 18;	-- 18
+		BackPorch_Hor: natural:= 50;	-- 50
+		FrontPorch_Ver: natural:= 10;	-- 10
+		BackPorch_Ver: natural:= 33;	-- 33
+		
+		Total_Hor_length: natural:= 800;
+        Total_Ver_length: natural:= 525;
+        active_Hor_length: natural:= 640;
+        active_Ver_length: natural:= 480);
+		
+	port(
+	i_Clk: in std_logic;
+	sw1: in std_logic;		-- reset
+	i_UART_RX: in std_logic;
+	
+	-- UART
+	o_UART_TX: out std_logic;
+	
+	--Seven Segment Display
+	o_Segment1_A: out std_logic;
+	o_Segment1_B: out std_logic;
+	o_Segment1_C: out std_logic;
+	o_Segment1_D: out std_logic;
+	o_Segment1_E: out std_logic;
+	o_Segment1_F: out std_logic;
+	o_Segment1_G: out std_logic;
+	o_Segment2_A: out std_logic;
+	o_Segment2_B: out std_logic;
+	o_Segment2_C: out std_logic;
+	o_Segment2_D: out std_logic;
+	o_Segment2_E: out std_logic;
+	o_Segment2_F: out std_logic;
+	o_Segment2_G: out std_logic;
+	
+	-- VGA
+	o_VGA_HSync: out std_logic;
+	o_VGA_VSync: out std_logic;
+	o_VGA_Red_0: out std_logic;
+    o_VGA_Red_1: out std_logic;
+    o_VGA_Red_2: out std_logic;
+    o_VGA_Grn_0: out std_logic;
+    o_VGA_Grn_1: out std_logic;
+    o_VGA_Grn_2: out std_logic;
+    o_VGA_Blu_0: out std_logic;
+    o_VGA_Blu_1: out std_logic;
+    o_VGA_Blu_2: out std_logic);
+	
+end entity VGA_Monitor_Test;
+
+
+
+architecture description of VGA_Monitor_Test is
+	
+  -- For synchronisation
+  signal sw1Dbounced: std_logic:= '0';
+  signal sw1Sync: std_logic_vector(1 downto 0):= "00";
+  
+  -- UART 
+  signal tx_Nutzframe,rx_Nutzframe: std_logic_vector(7 downto 0):= (others => '0');
+  signal uart_rxframeValid: std_logic;
+  
+  signal w_Hsync,w_Vsync: std_logic;
+  signal w_Hsync2RowCol,w_Vsync2RowCol: std_logic;
+  signal RowPos: natural range 0 to Total_Ver_length - 1;
+  signal ColPos: natural range 0 to Total_Hor_length - 1; 
+  
+  signal w_Red: std_logic_vector(NbrBits4RGB - 1 downto 0);
+  signal w_Grn: std_logic_vector(NbrBits4RGB - 1 downto 0);
+  signal w_Blu: std_logic_vector(NbrBits4RGB - 1 downto 0);
+
+begin
+
+
+  -- Synchronisation
+  Sync: process(i_Clk)
+  begin
+	if rising_edge(i_Clk) then
+		sw1Sync <= sw1Sync(0) & sw1;
+	end if;
+  end process;
+
+
+  -- Debounce reseet signal
+  Debouncing: entity module.debounceunit
+  	generic map(DebounceTime => 125000)
+  	port map(i_Clk,sw1Sync(1),sw1Dbounced);
+
+
+  UART_RX: entity module.receiver
+  	generic map(
+  		ClkFreq2Bdrate => 217,
+  		Nbr_data_bits => 8,
+  		EnParityCheck => '0',
+  		parity => '0',
+  		stop_bits => 1)
+  		
+  	port map(
+  		reset => sw1Dbounced,
+  		i_Clk => i_Clk,
+  		rx_data => i_UART_RX,
+  		Data_Valid => uart_rxframeValid,
+  		Nutzframe => rx_Nutzframe);
+
+  -- Save RX_Frame
+  Save_RX_Frame: process(i_Clk,sw1Dbounced) is
+  begin
+	
+	if sw1Dbounced = '1' then
+	    tx_Nutzframe <= (others => '0');
+		
+	elsif rising_edge(i_Clk) then
+	
+		if uart_rxframeValid = '1'  then
+			tx_Nutzframe <= rx_Nutzframe;	
+		end if;
+		
+	end if;
+  end process;
+  
+  
+  UART_TX: entity module.transmitter
+  	generic map(
+  		ClkFreq2Bdrate => 217,
+  		Nbr_data_bits => 8,
+  		EnParityCheck => '0',
+  		parity => '0',
+  		stop_bits => 1)
+  		
+  	port map(
+  		reset => sw1Dbounced,
+  		i_Clk => i_Clk,
+  		tx_data => o_UART_TX,
+  		Nutzframe => tx_Nutzframe);
+		
+   
+  SevenSegmentDisplay1: entity module.SevenSegmentDisplay
+	port map(i_Clk,sw1Dbounced,tx_Nutzframe(7 downto 4),o_Segment1_A,o_Segment1_B,o_Segment1_C,
+			 o_Segment1_D,o_Segment1_E,o_Segment1_F,o_Segment1_G);
+			 
+  SevenSegmentDisplay2: entity module.SevenSegmentDisplay
+	port map(i_Clk,sw1Dbounced,tx_Nutzframe(3 downto 0),o_Segment2_A,o_Segment2_B,o_Segment2_C,
+			 o_Segment2_D,o_Segment2_E,o_Segment2_F,o_Segment2_G);
+			 
+			 
+  GenSyncPulse:entity work.Sync_Pulse_Generator
+	generic map(active_Hor_length,active_Ver_length,Total_Hor_length,Total_Ver_length)
+	port map(i_Clk,sw1Dbounced,w_Hsync,w_Vsync);
+
+
+  RowColPosition:entity work.Sync_2_Row_Column_Position
+	generic map(Total_Hor_length,Total_Ver_length)
+	port map(i_Clk,sw1Dbounced,w_Hsync,w_Vsync,w_Hsync2RowCol,w_Vsync2RowCol,RowPos,ColPos); 	--     
+
+
+  GenTestPattern:entity work.Test_Pattern_Generator
+	generic map(NbrBits4RGB,active_Hor_length,active_Ver_length,Total_Hor_length,Total_Ver_length)
+	port map(tx_Nutzframe(3 downto 0),RowPos,ColPos,w_Red,w_Grn,w_Blu);	-- i_Clk,sw1Dbounced,,w_Hsync,w_Vsync
+
+
+  Hor_Porch: o_VGA_HSync <= '1' when ((ColPos <= ((active_Hor_length -1) + FrontPorch_Hor) and (ColPos > (active_Hor_length -1))) or 
+  									  (ColPos > ((Total_Hor_length - 1) - BackPorch_Hor))) and sw1Dbounced = '0' else w_Hsync2RowCol;
+    
+    
+  Ver_Porch: o_VGA_VSync <= '1' when ((RowPos <= ((active_Ver_length -1) + FrontPorch_Ver) and (RowPos > (active_Ver_length -1))) or 
+									  (RowPos > ((Total_Ver_length - 1) - BackPorch_Ver))) and sw1Dbounced = '0' else w_Vsync2RowCol;
+
+--  AdaptSync2Porch:entity work.VGA_Sync_Porch
+--	generic map(NbrBits4RGB,FrontPorch_Hor,BackPorch_Hor,FrontPorch_Ver,BackPorch_Ver,
+--				active_Hor_length,active_Ver_length,Total_Hor_length,Total_Ver_length)
+--				
+--	port map(i_Clk,sw1Dbounced,RowPos,ColPos,w_HsyncPorch,w_VsyncPorch);	-- ,w_Hsync,w_Vsync
+	   
+  
+  o_VGA_Red_0 <= w_Red(0);
+  o_VGA_Red_1 <= w_Red(1);
+  o_VGA_Red_2 <= w_Red(2);
+  o_VGA_Grn_0 <= w_Grn(0);
+  o_VGA_Grn_1 <= w_Grn(1);
+  o_VGA_Grn_2 <= w_Grn(2);
+  o_VGA_Blu_0 <= w_Blu(0);
+  o_VGA_Blu_1 <= w_Blu(1);
+  o_VGA_Blu_2 <= w_Blu(2);
+  
+end description;
+
+
+
+
+
+--pragma translate_off
+Library ieee;
+Library Module;
+use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
+
+
+entity Testbench_VGA_Monitor_Test is
+
+end entity;
+
+
+architecture testing of Testbench_VGA_Monitor_Test is
+
+  signal clk,rst: std_logic:='0';
+  
+  signal Nutz_frameIn,Nutz_frameOut: std_logic;
+  
+--type konfigs is array(syncH'range,1 to 4) of natural;	
+--
+--					  --  1	    2    3     4
+--constant konfig: konfigs:=((640 , 480, 800 , 525),	-- 3
+--						(640 , 350, 800 , 449),	-- 2
+--						(768 , 576, 976 , 597),	-- 1
+--						(1024, 768, 1264, 817));-- 0
+  
+  signal HSyncOut,VSyncOut: std_logic;
+  
+  signal VGA_Red,VGA_Green,VGA_Blue: std_logic_vector(2 downto 0);
+  
+  signal Segment1A,Segment1B,Segment1C,Segment1D,Segment1E,Segment1F,Segment1G,
+		 Segment2A,Segment2B,Segment2C,Segment2D,Segment2E,Segment2F,Segment2G: std_logic;
+
+
+begin
+
+
+  clk <= not clk after 20 ns;
+  rst <= '1' after 35.7 us,'0' after 63.2 us; 
+  
+  Nutz_frameIn <= '1','0' after 452 ns,'1' after 17.813  us,'0' after 43.854  us,'1' after 52.535  us,'0' after  61.215 us,'1' after  69.896 us, 					-- 0 0111 0101 1
+				  '0' after 95  us,'1' after 138.4027 us,'0' after 155.7638 us,'1' after 173.125 us,																-- 0 0000 1100 1 (0)
+				  '0' after 8220 us,'1' after 8228.6805 us,'0' after 8237.3611 us,'1' after 8263.403 us,'0' after 8280.764 us,'1' after 8298.125 us,				-- 0 1000 1100 1 (1)	
+				  '0' after 18370 us,'1' after 18387.3611 us,'0' after 18396.0416 us,'1' after 18413.403 us,'0' after 18430.764 us,'1' after 18448.125 us,			-- 0 0100 1100 1 (2)
+				  '0' after 31480 us,'1' after 31488.6805 us,'0' after 31506.0416 us,'1' after 31523.403 us,'0' after 31540.764 us,'1' after 31558.125 us,			-- 0 1100 1100 1 (3)
+				  '0' after 46580 us,'1' after 46606.0416 us,'0' after 46614.7222 us,'1' after 46623.403 us,'0' after 46640.764 us,'1' after 46658.125 us,			-- 0 0010 1100 1 (4)
+				  '0' after 59695 us,'1' after 59703.6805 us,'0' after 59712.3611 us,'1' after 59721.042 us,'0' after 59729.722 us,'1' after 59738.403 us,'0' after 59755.764 us,'1' after 59773.125 us,	-- 0 1010 1100 1 (5) 
+				  '0' after 73810 us,'1' after 73827.3611 us,'0' after 73844.7222 us,'1' after 73853.403 us,'0' after 73870.764 us,'1' after 73888.125 us;			-- 0 0110 1100 1 (6)
+  
+  
+  
+
+
+  DUT:entity work.VGA_Monitor_Test
+	generic map(
+		NbrBits4RGB => 3,
+		
+	    FrontPorch_Hor	=> 18,
+	    BackPorch_Hor	=> 50,
+	    FrontPorch_Ver	=> 10,
+	    BackPorch_Ver	=> 33,
+	    
+	    Total_Hor_length	=> 800,	 
+	    Total_Ver_length	=> 525, 
+	    active_Hor_length	=> 640,
+	    active_Ver_length	=> 480)
+	
+	port map(
+		i_Clk		=> clk,
+		sw1			=> rst,
+		i_UART_RX	=> Nutz_frameIn,
+		
+		-- UART
+		o_UART_TX	=> Nutz_frameOut,
+		
+		--Seven Segm
+		o_Segment1_A => Segment1A,
+		o_Segment1_B => Segment1B,
+		o_Segment1_C => Segment1C,
+		o_Segment1_D => Segment1D,
+		o_Segment1_E => Segment1E,
+		o_Segment1_F => Segment1F,
+		o_Segment1_G => Segment1G,
+		o_Segment2_A => Segment2A,
+		o_Segment2_B => Segment2B,
+	    o_Segment2_C => Segment2C,
+	    o_Segment2_D => Segment2D,
+	    o_Segment2_E => Segment2E,
+	    o_Segment2_F => Segment2F,
+	    o_Segment2_G => Segment2G,
+	    
+	    -- VGA
+	    o_VGA_HSync => HSyncOut,
+	    o_VGA_VSync => VSyncOut,
+	    o_VGA_Red_0 => VGA_Red(0),
+	    o_VGA_Red_1 => VGA_Red(1),
+	    o_VGA_Red_2 => VGA_Red(2),
+	    o_VGA_Grn_0 => VGA_Green(0),
+	    o_VGA_Grn_1 => VGA_Green(1),
+	    o_VGA_Grn_2 => VGA_Green(2),
+	    o_VGA_Blu_0 => VGA_Blue(0),
+	    o_VGA_Blu_1 => VGA_Blue(1),
+	    o_VGA_Blu_2 => VGA_Blue(2));
+
+
+end testing;
+
+
+
+
+--pragma translate_on
