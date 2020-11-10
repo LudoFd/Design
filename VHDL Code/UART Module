@@ -1,0 +1,426 @@
+-- This design defines a UART Trasnmitter and a Receiver.
+-- For each Module there is a set of generic which configure
+-- the final instance to be synthetizes
+-- The sender module starts a transmission whenever its input
+-- Nutzframe changes. At the end of each trasnmission both Module
+-- outputs a DataValid Bit. This Bit serves for the receiver also
+-- as parity error check helping for the detection of faultly
+-- transmission
+
+Library ieee;
+--Library Module; (1)
+use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
+--use ieee.fixed_pkg.all; only if this package is synthetisable (1)
+--use Module.nutz_package.all; (1)
+
+entity receiver is
+	generic(
+		ClkFreq2Bdrate: natural:= 2604;	-- => 25 MHz/9600
+	    Nbr_data_bits: natural:= 8;
+	    EnParityCheck: std_logic:= '0';
+	    parity: std_logic:= '0';
+	    stop_bits: natural:= 0);	--Module.nutz_package.UART_NbrStopBits:= Module.nutz_package.UART_Bits0);	only if (1)
+		--flow_control:	   std_logic);	-- '0' = off, '1' = on
+	port(
+		reset:	  in std_logic;
+		i_Clk: in std_logic;
+		rx_data: in std_logic;	-- input
+		
+		Data_Valid: out std_logic;	
+		Nutzframe: out std_logic_vector(Nbr_data_bits -1 downto 0));
+end receiver;
+
+architecture rtl_receiver of receiver is
+
+--constant for_0: UART_NbrStopBits:= Module.nutz_package.UART_Bits0;
+
+constant rx_abtast_rate: unsigned(18 downto 0):= to_unsigned(ClkFreq2Bdrate,19);	-- 19 to count also for Bdrate = 50 Bits
+-- 2^19 = 524288 > max rx_abtast_rate, 2^20 = 1048576 for counting one half more than(> 750000) max rx_abtast_rate to recognise FrameStart;	 
+-- min = 8.33 ~ 8(Baudrate = 3 MBits/sec)< rx_abtast_rate < max = 500000(Baudrate = 50 Bits/sec) "011011001";
+	
+constant half_rx_abtast_rate: unsigned((rx_abtast_rate'high) downto 0):= rx_abtast_rate / 2; 	
+signal rx_bit_abstater: unsigned(rx_abtast_rate'range):= (others => '0');
+
+constant max_bits: unsigned(3 downto 0):= to_unsigned(Nbr_data_bits,4);	--:= "1000";	-- später a function soll die constante Nbr_date_bits in unsigned überführen
+signal rx_bit_counter: unsigned(3 downto 0):= (others => '0');
+
+type rx_state is (rx_idle,rx_FrameStart,rx_dataBits,rx_parityCheck,rx_FrameStop);
+signal fsm_state: rx_state:= rx_idle;
+
+signal rx_in: std_logic:= '1';
+signal correct_start: boolean;
+
+signal r_nutz_frame: std_logic_vector(Nbr_data_bits -1 downto 0):= (others => '0');
+
+signal parity_bit: std_logic:='0';
+signal parity_error: std_logic:='0';
+signal stopBit_error: std_logic:= '0';
+
+signal nbr_StopBits: natural range 0 to 2:= 0; 	-- Module.nutz_package.UART_NbrStopBits:= "000"; only if (1)
+
+begin
+
+
+--synchronisation: process(i_Clk)--,reset)
+--begin
+--
+--	if rising_edge(i_Clk) then
+--		-- synchronisation
+--		rx_in <= rx_in(1 downto 0) & rx_data;
+--	end if;
+--
+--end process;
+saveRX: process(i_Clk,reset)
+begin
+	if reset = '1' then
+		rx_in <= '0';
+	elsif rising_edge(i_Clk) then
+		rx_in <= rx_data;
+	end if;
+end process;
+
+rx_counter: process(i_Clk,reset)
+begin
+	if reset = '1' then
+		rx_bit_abstater <= (others => '0');
+		
+	elsif rising_edge(i_Clk) then
+																		
+		if (fsm_state = rx_idle) or (rx_bit_abstater = rx_abtast_rate - 1) then 	
+			rx_bit_abstater <= (others => '0');
+		
+		else
+			rx_bit_abstater <= rx_bit_abstater + 1;
+		end if;
+	end if;
+
+end process;
+
+
+
+rx_fsm_transition: process(i_Clk,reset)
+begin
+
+	if reset = '1' then
+		fsm_state <= rx_idle;
+	
+	elsif rising_edge(i_Clk) then
+	
+		-- state transition
+		if fsm_state = rx_idle and (rx_data = '0' and rx_in = '1') then	-- falling edge detection for start Bit
+			fsm_state <= rx_FrameStart;
+			
+		elsif fsm_state = rx_FrameStart and rx_bit_abstater = (rx_abtast_rate - 1) then
+			fsm_state <= rx_dataBits;
+			
+		elsif fsm_state = rx_dataBits and (rx_bit_counter = max_bits and (rx_bit_abstater = rx_abtast_rate - 1))
+			and EnParityCheck = '1' then
+			fsm_state <= rx_parityCheck;
+			
+		elsif fsm_state = rx_dataBits and (rx_bit_counter = max_bits and (rx_bit_abstater = rx_abtast_rate - 1)) 
+			and EnParityCheck = '0' and stop_bits /= 0 then -- (stop_bits /= Module.nutz_package.UART_Bits0) only if (1)
+			fsm_state <= rx_FrameStop;
+			
+		elsif fsm_state = rx_dataBits and (rx_bit_counter = max_bits and (rx_bit_abstater = rx_abtast_rate - 1))
+			and EnParityCheck = '0' and stop_bits = 0 then -- (stop_bits = Module.nutz_package.UART_Bits0) only if (1)
+			fsm_state <= rx_idle;
+			
+		elsif fsm_state = rx_parityCheck and (rx_bit_abstater = rx_abtast_rate - 1) and
+			  stop_bits /= 0 then -- (stop_bits /= Module.nutz_package.UART_Bits0) only if (1)
+			fsm_state <= rx_FrameStop;
+			
+		elsif fsm_state = rx_parityCheck and (rx_bit_abstater = rx_abtast_rate - 1) and
+			  stop_bits = 0 then 	-- stop_bits = Module.nutz_package.UART_Bits0 then only if(1)
+			fsm_state <= rx_idle;
+			
+		elsif fsm_state = rx_FrameStop and nbr_StopBits = stop_bits then
+			fsm_state <= rx_idle;
+		
+		end if;
+			
+	end if;
+
+end process rx_fsm_transition;
+
+FSM_RX: process(i_Clk,reset)
+begin
+
+if reset = '1' then
+	rx_bit_counter  <= (others => '0');
+	r_nutz_frame <= (others => '0');
+	parity_bit <= '0';
+	nbr_StopBits <= 0;
+	parity_error <= '0';
+	correct_start <= false;
+	stopBit_error <= '0';
+
+elsif rising_edge(i_Clk) then
+
+	case fsm_state is
+	
+		when rx_idle =>
+			--rx_bit_abstater <= (others => '0'); 
+			rx_bit_counter  <= (others => '0');
+			--r_nutz_frame <= (others => '0');
+			nbr_StopBits <= 0;	-- Module.nutz_package.UART_Bits0; only if (1)
+			correct_start <= false;
+			parity_bit <= '0';
+			parity_error <= '0';
+			stopBit_error <= '0';
+			
+			
+		when rx_FrameStart =>
+
+			if rx_bit_abstater = (half_rx_abtast_rate - 1) and rx_in = '0' then
+				correct_start <= true;
+			end if;
+
+		
+		when rx_dataBits =>
+			
+			if rx_bit_abstater = half_rx_abtast_rate - 1 then
+				rx_bit_counter <= rx_bit_counter + 1;
+				r_nutz_frame <= rx_data & r_nutz_frame(Nutzframe'high downto 1);
+			end if;	
+			
+		
+		when rx_parityCheck =>	-- '1' = odd, '0' = even
+			
+			parity_bit <= xor (r_nutz_frame & parity);	-- reduction operator bigger precedence than logical and
+			
+			if rx_bit_abstater = half_rx_abtast_rate - 1 and parity_bit /= rx_data  then
+				parity_error <= '1';
+			end if;
+			
+					
+		when rx_FrameStop =>
+			
+			if rx_data = '0' and nbr_StopBits /= stop_bits then
+				stopBit_error <= '1';
+			
+			elsif  (rx_bit_abstater = rx_abtast_rate - 1) then
+			
+				nbr_StopBits <= nbr_StopBits + 1;
+			end if;
+			
+			-- to use if 0.5 or package fixeg_package can be synthetisable
+			--elsif (rx_bit_abstater = half_rx_abtast_rate - 1) or  (rx_bit_abstater = rx_abtast_rate - 1) then	
+			--
+			--	nbr_StopBits <= resize( arg => nbr_StopBits + to_ufixed(0.5,1,-1),
+			--    						left_index => 1,
+			--    						right_index => -1);
+			--    					-- resize ist notwendig denn in fixe_generic_package function
+			--    					-- "+" ist für accumulator mit size operand + 1 definiert
+			--end if;
+			
+				
+		when others =>
+			null;
+			
+	end case;
+		
+end if;
+
+end process;
+
+Data_Valid <= not parity_error when fsm_state = rx_parityCheck else
+			  not stopBit_error when fsm_state = rx_FrameStop else 
+			  '0';
+			  
+Nutzframe <= r_nutz_frame;
+ 
+end rtl_receiver;
+
+
+
+
+Library ieee;
+--Library Module; (1)
+use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
+--use ieee.fixed_pkg.all; only if this package is synthetisable (1)
+--use Module.nutz_package.all; (1)
+
+entity transmitter is
+	generic(
+		ClkFreq2Bdrate: natural:= 2604;	-- => 25 MHz/9600
+	    Nbr_data_bits: natural:= 8;
+	    EnParityCheck: std_logic:= '0';	-- '0' no parity check, '1' parity is to be checked
+	    parity: std_logic:= '0';			-- '1' odd, '0' even
+	    stop_bits: natural:= 0);	-- Module.nutz_package.UART_NbrStopBits:= Module.nutz_package.UART_Bits0);	only if (1)
+		
+	port(
+		i_Clk: in std_logic;
+		reset: in std_logic; 
+		Nutzframe: in std_logic_vector(Nbr_data_bits-1 downto 0);	-- Nutzdaten to be send
+		
+		tx_data: out std_logic);	-- frame to be send
+end transmitter;
+
+architecture rtl_transmitter of transmitter is
+
+constant tx_abtast_rate: unsigned(18 downto 0):= to_unsigned(ClkFreq2Bdrate,19);	-- 19 to count also for Bdrate = 50 Bits
+constant half_tx_abtast_rate: unsigned(tx_abtast_rate'high downto 0):= tx_abtast_rate / 2; 	
+signal tx_abstater: unsigned(tx_abtast_rate'range):= (others => '0');
+
+constant max_bits: unsigned(3 downto 0):= to_unsigned(Nbr_data_bits,4);	--:= "1000";	-- später a function soll die constante Nbr_date_bits in unsigned überführen
+signal tx_bit_counter: unsigned(max_bits'range):= (others => '0');
+
+type state is (tx_idle,tx_FrameStart,tx_dataBits,tx_DefParityBit,tx_FrameStop);
+signal tx_fsm_state: state:= tx_idle;
+
+signal nbr_StopBits: natural range 0 to 2:= 0;	--  Module.nutz_package.UART_NbrStopBits:= "000"; only if (1)
+
+--constant OutputDataLength: natural:= 1 + Nutzframe'length + parity'length + stop_bits'length;
+signal Nutzframe_in: std_logic_vector(Nbr_data_bits-1 downto 0);
+signal tx_data_in: std_logic;
+
+begin
+
+
+tx_counter: process(i_Clk,reset)
+begin
+	if reset = '1' then
+		tx_abstater <= (others => '0');
+		
+	elsif rising_edge(i_Clk) then
+																			
+		if tx_fsm_state = tx_idle or tx_abstater = tx_abtast_rate - 1 then						
+			tx_abstater <= (others => '0');
+		
+		else
+			tx_abstater <= tx_abstater + 1;
+		
+		end if;
+	end if;
+end process;
+
+
+
+tx_fsm_transition: process(i_Clk,reset)
+begin
+
+	if reset = '1' then
+		tx_fsm_state <= tx_idle;
+	elsif rising_edge(i_Clk) then
+	
+		if tx_fsm_state = tx_idle and Nutzframe_in /= Nutzframe then	
+			tx_fsm_state <= tx_FrameStart;
+			
+		elsif tx_fsm_state = tx_FrameStart and tx_abstater = (tx_abtast_rate - 1) then
+			tx_fsm_state <= tx_dataBits;
+			
+		elsif tx_fsm_state = tx_dataBits and tx_bit_counter = max_bits and EnParityCheck = '1' then
+			tx_fsm_state <= tx_DefParityBit;
+			
+		elsif tx_fsm_state = tx_dataBits and tx_bit_counter = max_bits and 
+			  EnParityCheck = '0' and stop_bits /= 0 then -- stop_bits /= Module.nutz_package.UART_Bits0 then only if (1)
+			tx_fsm_state <= tx_FrameStop;
+			
+		elsif tx_fsm_state = tx_dataBits and tx_bit_counter = max_bits and
+			  EnParityCheck = '0' and stop_bits = 0 then --stop_bits = Module.nutz_package.UART_Bits0 then only if (1)
+			tx_fsm_state <= tx_idle;
+			
+		elsif tx_fsm_state = tx_DefParityBit and (tx_abstater = tx_abtast_rate - 1) and 
+			  stop_bits /= 0 then 	--  stop_bits /= Module.nutz_package.UART_Bits0 then only if (1) 
+			tx_fsm_state <= tx_FrameStop;
+			
+		elsif tx_fsm_state = tx_DefParityBit and (tx_abstater = tx_abtast_rate - 1) and
+			  stop_bits = 0 then	-- stop_bits = Module.nutz_package.UART_Bits0 then only if (1)
+			tx_fsm_state <= tx_idle;
+			
+		elsif tx_fsm_state = tx_FrameStop and nbr_StopBits = stop_bits then
+			tx_fsm_state <= tx_idle;
+		
+		end if;
+			
+	end if;
+
+end process tx_fsm_transition;
+
+FSM_TX: process(i_Clk,reset)
+variable i: natural range 0 to (Nbr_data_bits - 1);
+
+begin
+
+if reset = '1' then
+	--bit_abstater <= (others => '0');
+	tx_bit_counter  <= (others => '0');
+	Nutzframe_in <= (others => '0');
+	nbr_StopBits <= 0;
+	i := 0;
+	tx_data_in <= '0';
+	
+elsif rising_edge(i_Clk) then
+
+	Nutzframe_in <= Nutzframe;	-- save data to be send
+	
+	case tx_fsm_state is
+	
+		when tx_idle =>
+			
+			tx_bit_counter <= (others => '0');
+			nbr_StopBits <= 0;	-- Module.nutz_package.UART_Bits0; only if (1)
+			tx_data_in <= '1';
+			i:= 0;
+			
+		when tx_FrameStart =>
+			
+			tx_data_in <= '0';
+				
+		
+		when tx_dataBits =>
+			
+			tx_data_in <= Nutzframe_in(i);
+			
+			if tx_abstater = tx_abtast_rate - 1 and tx_bit_counter < (max_bits - 1) then
+				
+				i:= i + 1;			
+			elsif tx_bit_counter = "0000" then 
+				i:= 0;
+			end if;
+			
+			if tx_abstater = tx_abtast_rate - 1 and tx_bit_counter < max_bits then
+				tx_bit_counter <= tx_bit_counter + 1;
+				
+			end if;
+			
+		
+		when tx_DefParityBit =>	-- '1' = odd, '0' = even
+			
+			tx_data_in <= xor (Nutzframe_in & parity);	-- reduction operator bigger precedence than logical and
+			
+					
+		when tx_FrameStop =>
+			
+			tx_data_in <= '1';
+			
+			if (tx_abstater = tx_abtast_rate - 1) then
+				nbr_StopBits <= nbr_StopBits + 1;
+			end if;
+			
+			
+			---- to use if 0.5 or package fixeg_package can be synthetisable
+			--if (tx_abstater = half_tx_abtast_rate - 1) or (tx_abstater = tx_abtast_rate - 1) then
+			--
+			--	nbr_StopBits <= resize( arg => nbr_StopBits + to_ufixed(0.5,1,-1),
+			--    						left_index => 1,
+			--    						right_index => -1);
+			--    					-- resize ist notwendig denn in fixe_generic_package function
+			--    					-- "+" ist für accumulator mit size operand + 1 definiert
+			--end if;
+			
+			
+		when others =>
+			null;
+			
+	end case;
+		
+end if;
+
+end process;
+
+tx_data <= tx_data_in;
+
+end rtl_transmitter;
