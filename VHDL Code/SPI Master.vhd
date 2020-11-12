@@ -154,7 +154,7 @@ begin
 	case state is
 	
 		when idle =>
-			r_BaudCounter <= SCLK_Freq;
+			r_BaudCounter <= SCLK_Freq - 1;
 	  		r_bitCounter <= (others => '0');
 			r_done <= '0';
 			r_msb <= msb;
@@ -164,7 +164,7 @@ begin
 			
 			Baudrate:
 			if r_BaudCounter = BaudCounterZero then
-				r_BaudCounter <= SCLK_Freq;
+				r_BaudCounter <= SCLK_Freq - 1;
 				
 			else
 				r_BaudCounter <= r_BaudCounter - 1;
