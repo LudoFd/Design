@@ -42,12 +42,7 @@
 --  |			rx_frame:				|	The contains of the Shift Register are make available here	|
 --  |								|	at the end of a cycle and are valid when done is asserted	|
 --  |								|									|
---  |			SCLK_Freq:	   			|	Defines the Bit timing. Can only be set, when the		|
---  |							   	|	freigabe input is still not asserted before a transmis-   	|
---  |							   	|	sion is started, thus only when no Transaction is running 	|
---  |							   	|													  		  	|
---  |							   	|															  	|
-
+															  
 Library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
