@@ -156,6 +156,7 @@ begin
 			r_BaudCounter <= SCLK_Freq;
 			r_done <= '0';
 			r_msb <= msb;
+			r_sclk <= setup(mode);
 		
 		when activ =>
 			
