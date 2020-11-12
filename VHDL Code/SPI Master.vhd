@@ -16,7 +16,7 @@
 
 -- ------------------------------------- Port Description ------------------------------------------
 --  |								|																|
---  |				msb:				|	Define if the Data should be trasnmitted MSB first or LSB	|
+--  |			msb:					|	Define if the Data should be trasnmitted MSB first or LSB	|
 --  |								|	first. msb = '1' then MSB first else LSB first.			|
 --  |								|																|
 --  |			SCLK_Freq:				|	Defines the Baudrate for a SPI Cycle as a u_unsigned 		|
@@ -232,7 +232,7 @@ begin
 			end if;
 		end if;
     
-    end process ShiftingBits; 
+    end process ShiftingBits0; 
 	
   else generate
  
@@ -253,7 +253,7 @@ begin
 			end if;
 		end if;
 		
-    end process ShiftingBits;
+    end process ShiftingBits1;
   
   end generate SPI_Mode;
   
