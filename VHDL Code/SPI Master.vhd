@@ -15,38 +15,38 @@
 
 
 -- ------------------------------------- Port Description ------------------------------------------
---	|								|																|
---	|				msb:			|	Define if the Data should be trasnmitted MSB first or LSB	|
---	|								|	first. msb = '1' then MSB first else LSB first.				|
---	|								|																|
---	|			SCLK_Freq:			|	Defines the Baudrate for a SPI Cycle as a u_unsigned 		|
---	|								|	vector. The vector length is given by the generic			|
---	|								|	MaxBaudrateCounterLength which default value is 10. So the	|
---	|								|	synthetisize module could divide the system clock down to	|
---	|								|	1024 its nominal value. Therefore for a system clock of 	|
---	|								|	50 MHz, the	minimum  Baudrate could be ~ 38.4 KBits/S.		|
---	|								|																|
---  |			DataValid:			|	Enable parallel load of the Shift register with new data  	|
---  |               	  			|	to be send.											  	  	|
---  |               	  			|														  	  	|
---  |			freigabe:			|	Enable an new SPI Cycle when set otherwise the Master is  	|
---  |               	  			|   freezed and remain on state idle.						  	|
---  |							   	|	 													      	|
---  |				done:			|	Signalises that the SPI Master has finished a trasnmission,	|
+--  |								|																|
+--  |				msb:				|	Define if the Data should be trasnmitted MSB first or LSB	|
+--  |								|	first. msb = '1' then MSB first else LSB first.			|
+--  |								|																|
+--  |			SCLK_Freq:				|	Defines the Baudrate for a SPI Cycle as a u_unsigned 		|
+--  |								|	vector. The vector length is given by the generic		|
+--  |								|	MaxBaudrateCounterLength which default value is 10. So the	|
+--  |								|	synthetisize module could divide the system clock down to	|
+--  |								|	1024 its nominal value. Therefore for a system clock of 	|
+--  |								|	50 MHz, the	minimum  Baudrate could be ~ 38.4 KBits/S.	|
+--  |								|									|
+--  |			DataValid:				|	Enable parallel load of the Shift register with new data  	|
+--  |               	  					|	to be send.							|
+--  |               	  					|									|
+--  |			freigabe:				|	Enable an new SPI Cycle when set otherwise the Master is  	|
+--  |               	  					|   	freezed and remain on state idle.				|
+--  |							   	|	 								|
+--  |			done:					|	Signalises that the SPI Master has finished a trasnmission,	|
 --  |							   	|	the slave data could be read from the Shift Register.		|
---  |							   	|																|
---  |							   	|	 														  	|
---  |			tx_frame:		   	|	Use to load the Shift Register whenever the input DataValid	|
---	|							   	|	is set.													  	|
---	|								|																|
---	|			rx_frame:			|	The contains of the Shift Register are make available here	|
---	|								|	at the end of a cycle and are valid when done is asserted	|
---	|								|																|
---	|			SCLK_Freq:	   		|	Defines the Bit timing. Can only be set, when the		  	|
---	|							   	|	freigabe input is still not asserted before a transmis-   	|
---	|							   	|	sion is started, thus only when no Transaction is running 	|
---	|							   	|													  		  	|
---	|							   	|															  	|
+--  |							   	|									|
+--  |							   	|	 								|
+--  |			tx_frame:		   		|	Use to load the Shift Register whenever the input DataValid	|
+--  |							   	|	is set.								|
+--  |								|									|
+--  |			rx_frame:				|	The contains of the Shift Register are make available here	|
+--  |								|	at the end of a cycle and are valid when done is asserted	|
+--  |								|									|
+--  |			SCLK_Freq:	   			|	Defines the Bit timing. Can only be set, when the		|
+--  |							   	|	freigabe input is still not asserted before a transmis-   	|
+--  |							   	|	sion is started, thus only when no Transaction is running 	|
+--  |							   	|													  		  	|
+--  |							   	|															  	|
 
 Library ieee;
 use ieee.std_logic_1164.all;
@@ -104,17 +104,18 @@ architecture design of spi_master_M25P16 is
 	if s(0) = '0' then
 		return '0';
 	else
-		return '1';	
+		return '1';
+	end if;
   end function;
 
   type master_fsm is (idle,activ);
   signal state: master_fsm:= idle;
   
   signal r_sclk: std_udlogic:= setup(mode);
-  signal r_done,r_msb: std_ulogic:= '0';		-- r_LoadShiftRegister
+  signal r_done,r_msb: std_ulogic:= '0';		
   signal SPI_MasterBuffer,SPI_MasterShiftReg: std_ulogic_vector(MSB4FrameLength - 1 downto 0):= (others => '0');
   
-  signal r_bitCounter: u_unsigned(2 downto 0):= (others => '0');		-- NbrBit4BinaryBitCounter - 1
+  signal r_bitCounter: u_unsigned(2 downto 0):= (others => '0');		
   signal r_BaudCounter: u_unsigned(MaxBaudrateCounterLength - 1 downto 0):= (others => '1');
   constant BaudCounterZero: u_unsigned(MaxBaudrateCounterLength - 1 downto 0):= (others => '0');
   
@@ -256,7 +257,7 @@ begin
   
   end generate SPI_Mode;
   
-end block Core:
+end block Core;
 
 
 Outputs: block
