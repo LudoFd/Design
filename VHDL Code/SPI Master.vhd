@@ -59,8 +59,6 @@ entity spi_master_M25P16 is
 		-- Config for a transmission 
 		msb: in std_ulogic:= '1';	-- '0' LSB first, '1' MSB first
 		SCLK_Freq: in u_unsigned(MaxBaudrateCounterLength - 1 downto 0);
-		--tx_frame_bytelength: in u_unsigned(MSB4FrameLength - 1 downto 0);	-- Nbr of byte to send during a transmission
-		--rx_frame_bytelength: in u_unsigned(MSB4FrameLength - 1 downto 0);	-- Nbr of byte to be expected from the Slave during a transmission
 		
 		-- active signal during a trasnmission
 		clk: in std_ulogic;
@@ -99,22 +97,21 @@ architecture design of spi_master_M25P16 is
 	if s(0) = '0' then
 		return '0';
 	else
-		return '1';
+		return '1';	
 	end if;
   end function;
 
   type master_fsm is (idle,activ);
   signal state: master_fsm:= idle;
   
-  signal r_sclk: std_udlogic:= setup(mode);
+  signal r_sclk: std_ulogic:= setup(mode);
   signal r_done,r_msb: std_ulogic:= '0';		
-  signal SPI_MasterBuffer,SPI_MasterShiftReg: std_ulogic_vector(MSB4FrameLength - 1 downto 0):= (others => '0');
   
-  signal r_bitCounter: u_unsigned(2 downto 0):= (others => '0');		
+  signal r_bitCounter: u_unsigned(2 downto 0):= (others => '0');
   signal r_BaudCounter: u_unsigned(MaxBaudrateCounterLength - 1 downto 0):= (others => '1');
   constant BaudCounterZero: u_unsigned(MaxBaudrateCounterLength - 1 downto 0):= (others => '0');
   
-  signal SPI_MasterBuffer,SPI_MasterShiftReg: std_ulogic_vector(MSB4FrameLength - 1 downto 0):= (others => '0');
+  signal SPI_MasterShiftReg: std_ulogic_vector(MSB4FrameLength - 1 downto 0):= (others => '0');
 
 begin
 
@@ -130,8 +127,7 @@ begin
 	if state = idle and freigabe = '1' then
 		state <= activ;
 		
-	elsif state = activ and r_bitCounter = "111" and r_BaudCounter = BaudCounterZero
-		and freigabe = '0' then
+	elsif state = activ and r_done = '1' and freigabe = '0' then
 		state <= idle;
 			
 	end if;
@@ -155,10 +151,10 @@ begin
 	
 		when idle =>
 			r_BaudCounter <= SCLK_Freq - 1;
-	  		r_bitCounter <= (others => '0');
 			r_done <= '0';
 			r_msb <= msb;
 			r_sclk <= setup(mode);
+			r_bitCounter <= (others => '0');
 		
 		when activ =>
 			
@@ -172,7 +168,7 @@ begin
 			end if Baudrate;
 			
 			SPI_Clock:
-			if r_BaudCounter = BaudCounterZero then
+			if r_BaudCounter = BaudCounterZero or r_BaudCounter = (SCLK_Freq sra 1) then
 				r_sclk <= not r_sclk;
 				
 			end if SPI_Clock;
@@ -276,14 +272,17 @@ end block Outputs;
 
 
 end design;
-			
 
------------------------------------------- Testbench -----------------------------------
--- SPI MAster entity befindet sich im Library module
-			
+
+
+
+
+
+
 Library ieee;
 library Module;
 use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
 
 entity test is  
 
@@ -291,71 +290,212 @@ end entity;
 
 architecture testing of test is
 
+ constant AnzDuts: positive:= 8;
+
  signal clk: std_ulogic:= '0';
  signal rst: std_ulogic:= '0';
+ signal enable: std_ulogic;
  
- signal valid,enable,fertig: std_ulogic;
- signal frame2slave,frame2top: std_ulogic_vector(7 downto 0); 
- signal slavershiftegister: std_ulogic_vector(7 downto 0):= "00110101";
+ signal test_valid,test_fertig: std_ulogic_vector(1 to AnzDuts);
  
- signal spi_clk,spi_ss,spi_mosi,spi_miso: std_ulogic;
+ type daten2xchange is array (1 to AnzDuts) of std_ulogic_vector(7 downto 0);
+ signal frame2slave,frame2top: daten2xchange; 
  
- type Datensatz is array (2 downto 0) of std_logic_vector(7 downto 0);
- signal daten: Datensatz:= ("01010110","00011101","10110100");
  
- signal shift: std_ulogic:= '0';
+ signal spi_clk,spi_ss,spi_mosi,spi_miso: std_ulogic_vector(1 to AnzDuts);
+ 
+ type mode_spi is array (1 to AnzDuts) of std_ulogic_vector(1 downto 0);--(string("00"),string("01"),string("10"),string("11"));
+ type msb_spi  is array (1 to AnzDuts) of std_ulogic; 
+ constant mode_dut: mode_spi:= ("00","10","01","11","01","10","00","11");
+ constant msb_dut: msb_spi:= ('0','0','0','0','1','1','1','1');
+ 
+ component top_spi is	
+	port(
+		clock: in std_ulogic;
+		reset: in std_ulogic;
+		
+		fertig_top:  in std_ulogic;
+		frame_2_top: in std_ulogic_vector(7 downto 0);
+		
+		frame_2_slave: out std_ulogic_vector(7 downto 0);
+		DataValid: out std_ulogic);
+	
+end component;
+
+ component slave_spi is
+ 	generic(
+ 		mode: std_ulogic_vector(1 downto 0):= "00";
+ 		msb: std_ulogic:= '1');
+ 		
+ 	port(
+ 		spi_clk_slave: in std_ulogic;
+ 		reset: in std_ulogic;
+ 		
+		spi_ss_slave: in std_ulogic;
+ 		spi_mosi_slave: in std_ulogic;
+		spi_miso_slave: out std_ulogic);
+ 
+ end component;	
 
 begin
 
  clk <= not clk after 10 ns;
  rst <= '1' after 133 ns, '0' after 304 ns;
  
- frame2slave <= daten(0);
+ --frame2slave <= daten(0);
  enable <= '0','1' after 56 ns,'0' after 474 ns,'1' after 612 ns,'0' after 136 us, '1' after 149 us, '0' after 152 us;
  
- spi_miso <= slavershiftegister(7) when spi_ss = '0' else 'Z';  
+ 
+DUT: for i in mode_spi'range generate  
  
  inst: entity module.spi_master_M25P16
- generic map("00",10)
- port map('1',"0110110010",clk,rst,valid,enable,fertig,
-		  frame2slave,frame2top,spi_clk,spi_ss,spi_mosi,spi_miso);
-		  
- rx: process(spi_clk,rst)
- begin
-	if rst = '1' then
-		slavershiftegister <= "00110101";
-		
-	elsif rising_edge(spi_clk) then
-		slavershiftegister <= slavershiftegister(6 downto 0) & spi_mosi;
-		
-		
-	end if;
- end process rx;
+ generic map(mode_dut(i),10)
+ port map(msb_dut(i),"0110110010",clk,rst,test_valid(i),enable,test_fertig(i),
+		  frame2slave(i),frame2top(i),spi_clk(i),spi_ss(i),spi_mosi(i),spi_miso(i));
+
+ interactWithSPI_Master: top_spi
+ port map(clk,rst,test_fertig(i),frame2top(i),frame2slave(i),test_valid(i));	-- 
  
- send: process(clk,rst)
+ Slavemodell: slave_spi
+ generic map(mode_dut(i),msb_dut(i))
+ port map(spi_clk(i),rst,spi_ss(i),spi_mosi(i),spi_miso(i));
  
+ end generate;
+
+end testing;
+
+
+
+
+Library ieee;
+use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
+
+entity top_spi is
+		
+	port(
+		clock: in std_ulogic;
+		reset: in std_ulogic;
+		
+		fertig_top:  in std_ulogic;
+		frame_2_top: in std_ulogic_vector(7 downto 0);
+		
+		frame_2_slave: out std_ulogic_vector(7 downto 0);
+		DataValid: out std_ulogic);
+	
+end entity;
+
+
+architecture top_spi_design of top_spi is
+
+ type Datensatz is array (2 downto 0) of std_logic_vector(7 downto 0);
+ signal daten: Datensatz:= ("01010110","00011101","10110100");
+ 
+ signal shift: std_ulogic:= '0';
+ signal valid_top: std_ulogic;
+ 
+begin
+
+ send: process(clock,reset)
  begin
-	if rst = '1' then
-		valid <= transport '1' after 73 ns;
+	if reset = '1' then
+		valid_top <= transport '1' after 73 ns;
 		shift <= '0';
 		
-	elsif rising_edge(clk) then
+	elsif rising_edge(clock) then
 		
-		if fertig = '1' then
-			daten <= (2 => frame2top, 1 => daten(2), 0 => daten(1));
+		if fertig_top = '1' then
+			daten <= (2 => frame_2_top, 1 => daten(2), 0 => daten(1));
 			shift <= '1';
 			
 		elsif shift = '1' then 
-			valid <= '1';
+			valid_top <= '1';
 			shift <= '0';
 			
 		else 
-			valid <= '0';
+			valid_top <= '0';
 			
-		end if;
-		
+		end if;		
 	end if;
  end process;
+ 
+ DataValid <= valid_top;
+ frame_2_slave <= daten(0);
+ 
+end top_spi_design;
+		
+
+
+Library ieee;
+use ieee.std_logic_1164.all;
+
+entity slave_spi is
+	generic(
+		mode: std_ulogic_vector(1 downto 0):= "00";
+		msb: std_ulogic:= '1');
+		
+	port(
+		spi_clk_slave: in std_ulogic;
+		reset: in std_ulogic;
+		
+		spi_ss_slave: in std_ulogic;
+		spi_mosi_slave: in std_ulogic;
+		spi_miso_slave: out std_ulogic);
+
+end entity slave_spi;	
+
+
+architecture slave_spi_design of slave_spi is
+
+ signal slaveshiftegister: std_ulogic_vector(7 downto 0):= "00110101";
+ 
+ 
+begin
+
+modus: if xnor mode generate
+	
+ rx: process(spi_clk_slave,reset)
+ begin
+	if reset = '1' then
+		slaveshiftegister <= "00110101";
+		
+	elsif rising_edge(spi_clk_slave) then
+	
+		if msb = '1' then
+			slaveshiftegister <= slaveshiftegister(6 downto 0) & spi_mosi_slave;
+			
+		else 
+			slaveshiftegister <= spi_mosi_slave & slaveshiftegister(7 downto 1);
+			
+		end if;
+	
+	end if;
+ end process rx;
+ 
+else generate
+
+ rx: process(spi_clk_slave,reset)
+ begin
+	if reset = '1' then
+		slaveshiftegister <= "00110101";
+		
+	elsif falling_edge(spi_clk_slave) then
+	
+		if msb = '1' then
+			slaveshiftegister <= slaveshiftegister(6 downto 0) & spi_mosi_slave;
+			
+		else 
+			slaveshiftegister <= spi_mosi_slave & slaveshiftegister(7 downto 1);
+			
+		end if;
+	
+	end if;
+ end process rx;
+ 
+end generate;
+ 
+  spi_miso_slave <=	slaveshiftegister(7) when spi_ss_slave = '0' and msb = '1' else
+					slaveshiftegister(0) when spi_ss_slave = '0' and msb = '0' else 'Z';
 
 
 end architecture; 
