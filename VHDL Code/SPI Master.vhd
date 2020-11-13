@@ -276,3 +276,86 @@ end block Outputs;
 
 
 end design;
+			
+
+------------------------------------------ Testbench -----------------------------------
+-- SPI MAster entity befindet sich im Library module
+			
+Library ieee;
+library Module;
+use ieee.std_logic_1164.all;
+
+entity test is  
+
+end entity;
+
+architecture testing of test is
+
+ signal clk: std_ulogic:= '0';
+ signal rst: std_ulogic:= '0';
+ 
+ signal valid,enable,fertig: std_ulogic;
+ signal frame2slave,frame2top: std_ulogic_vector(7 downto 0); 
+ signal slavershiftegister: std_ulogic_vector(7 downto 0):= "00110101";
+ 
+ signal spi_clk,spi_ss,spi_mosi,spi_miso: std_ulogic;
+ 
+ type Datensatz is array (2 downto 0) of std_logic_vector(7 downto 0);
+ signal daten: Datensatz:= ("01010110","00011101","10110100");
+ 
+ signal shift: std_ulogic:= '0';
+
+begin
+
+ clk <= not clk after 10 ns;
+ rst <= '1' after 133 ns, '0' after 304 ns;
+ 
+ frame2slave <= daten(0);
+ enable <= '0','1' after 56 ns,'0' after 474 ns,'1' after 612 ns,'0' after 136 us, '1' after 149 us, '0' after 152 us;
+ 
+ spi_miso <= slavershiftegister(7) when spi_ss = '0' else 'Z';  
+ 
+ inst: entity module.spi_master_M25P16
+ generic map("00",10)
+ port map('1',"0110110010",clk,rst,valid,enable,fertig,
+		  frame2slave,frame2top,spi_clk,spi_ss,spi_mosi,spi_miso);
+		  
+ rx: process(spi_clk,rst)
+ begin
+	if rst = '1' then
+		slavershiftegister <= "00110101";
+		
+	elsif rising_edge(spi_clk) then
+		slavershiftegister <= slavershiftegister(6 downto 0) & spi_mosi;
+		
+		
+	end if;
+ end process rx;
+ 
+ send: process(clk,rst)
+ 
+ begin
+	if rst = '1' then
+		valid <= transport '1' after 73 ns;
+		shift <= '0';
+		
+	elsif rising_edge(clk) then
+		
+		if fertig = '1' then
+			daten <= (2 => frame2top, 1 => daten(2), 0 => daten(1));
+			shift <= '1';
+			
+		elsif shift = '1' then 
+			valid <= '1';
+			shift <= '0';
+			
+		else 
+			valid <= '0';
+			
+		end if;
+		
+	end if;
+ end process;
+
+
+end architecture; 
