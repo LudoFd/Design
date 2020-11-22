@@ -213,9 +213,21 @@ begin
     begin
     
 		if DataValid = '1' then
-			SPI_MasterShiftReg <= tx_frame;
-    	
-		elsif rising_edge(r_sclk) then
+			
+			SetBitforShiftRegister0:
+			for i in SPI_MasterShiftReg'range loop
+
+				if tx_frame(i) = '1' then
+					SPI_MasterShiftReg(i) <= '1';
+		
+				else
+					SPI_MasterShiftReg(i) <= '0';
+		
+				end if;
+
+			end loop SetBitforShiftRegister0;
+
+    		elsif rising_edge(r_sclk) then
 			
 			if r_msb = '1' then
 				SPI_MasterShiftReg <= SPI_MasterShiftReg(MSB4FrameLength - 2 downto 0) & miso;
@@ -235,6 +247,18 @@ begin
     
 		if DataValid = '1' then
 			SPI_MasterShiftReg <= tx_frame;
+	    		SetBitforShiftRegister1:
+			for i in SPI_MasterShiftReg'range loop
+				
+				if tx_frame(i) = '1' then
+					SPI_MasterShiftReg(i) <= '1';
+				
+				else
+					SPI_MasterShiftReg(i) <= '0';
+				
+				end if;
+			end loop SetBitforShiftRegister1;
+					
     	
 		elsif falling_edge(r_sclk) then
 			
