@@ -388,7 +388,7 @@ end design;
 
 
 
--- transte off
+-- transte_off
 
 Library ieee;
 use ieee.std_logic_1164.all;
@@ -606,4 +606,4 @@ end generate;
 
 end slave_spi_design; 
 
--- translate on
+-- translate_on
