@@ -29,42 +29,39 @@
 
 
 -- ------------------------------------- Port Description ------------------------------------------
---	|								    |																                                  |
---	|				msb:		    |  Define if the Data should be trasnmitted MSB first or LSB 	    |
---	|								    |	 first. msb = '1' then MSB first else LSB first.				        |
---	|								    |																                                  |
---	|		  SCLK_Freq:    |	 Defines the Baudrate for a SPI Cycle as a u_unsigned 		      |
---	|								    |	 vector. The vector length is given by the generic			        |
---	|								    |	 MaxBaudrateCounterLength which default value is 10. So the	    |
---	|								    |	 synthetisize module could divide the system clock down to	    |
---	|								    |	 1024 its nominal value. Therefore for a system clock of 	      |
---	|								    |	 50 MHz, the	minimum  Baudrate could be ~ 48.83 KBits/S.		    |
---	|								    |																                                  |
---  |	   DataValid:	    |	 Enable parallel load of the Shift register with new data  	    |
---  |            		    |	 to be send or enable a new SPI Cycle otherwise the master is  	|
---  |               	     freezed. ie remain in idle state 			                        |														  	  	|
---  |	                  |	 Enable an new SPI Cycle when set otherwise the Master is  	    |
---  |      	  			    |  freezed and remain on state idle.						  	              |
---  |						   	    |	 													      	                              |
---  |			done:			    |	 Signalises that the SPI Master has finished a Bus cycle, 	    |
---  |							      |	 the slave data could be read from the Shift Register.		      |
---  |							      |																                                  |
---  |							      |	 														  	                                |
---  |	  tx_frame:     	|	 Use to load the Shift Register whenever the input DataValid	  |
---	|							      |	 is set.													  	                          |
---	|								    |																                                  |
---	|		rx_frame:		    |	The contains of the Shift Register are make available here	    |
---	|								    |	at the end of a cycle and are valid when done is asserted	      |
---	|								    |																                                  |
---	|  CycleStartDelay:	|	Defines the nbr of SPI clock Cycle to wait after slave Se-    	|
---	|								    |	lect going low before the first bit beeing latched in.		      |
---	|								    |																                                  |
---	|		CycleEndDelay:	|	Defines the nbr of SPI clock Cycle to wait before slave		      |
---	|								    |	select goes high after latching in the last bit of a cycle.	    |
---	|								    |																                                  |
---	|							    	|																                                  |
---	|							   	  |													  		  	                              |
---	|							   	  |															  	                                |
+--  |			 |									|
+--  |	  msb:		 |  Define if the Data should be trasnmitted MSB first or LSB 	    	|
+--  |			 |	 first. msb = '1' then MSB first else LSB first.		|
+--  |			 |									|
+--  |	   SCLK_Freq:    |	 Defines the Baudrate for a SPI Cycle as a u_unsigned 		|
+--  |			 |	 vector. The vector length is given by the generic		|
+--  |			 |	 MaxBaudrateCounterLength which default value is 10. So the	|
+--  |			 |	 synthetisize module could divide the system clock down to	|
+--  |			 |	 1024 its nominal value. Therefore for a system clock of 	|
+--  |			 |	 50 MHz, the	minimum  Baudrate could be ~ 48.83 KBits/S.	|
+--  |			 |									|
+--  |	   DataValid:	 |	 Enable parallel load of the Shift register with new data  	|
+--  |            	 |	 to be send or enable a new SPI Cycle otherwise the master is  	|
+--  |               	 |       freezed. ie remain in idle state 			        |														  	  	|
+--  |			 |									|			 |	 								|
+--  |	     done:	 |	 Signalises that the SPI Master has finished a Bus cycle, 	|
+--  |			 |	 the slave data could be read from the Shift Register.		|
+--  |			 |									|
+--  |			 |	 								|
+--  |	  tx_frame:      |	 Use to load the Shift Register whenever the input DataValid	|
+--  |			 |	 is set.							|
+--  |			 |									|
+--  |	  rx_frame:	 |	The contains of the Shift Register are make available here	|
+--  |			 |	at the end of a cycle and are valid when done is asserted	|
+--  |			 |									|
+--  |	CycleStartDelay: |	Defines the nbr of SPI clock Cycle to wait after slave Se-    	|
+--  |			 |	lect going low before the first bit beeing latched in.		|
+--  |			 |									|
+--  |	CycleEndDelay:	 |	Defines the nbr of SPI clock Cycle to wait before slave		|
+--  |			 |	select goes high after latching in the last bit of a cycle.	|
+--  |			 |																                                  |																                                  |
+--  |			 |													  		  	                              |
+--  |			 |															  	                                |
 
 Library ieee;
 use ieee.std_logic_1164.all;
@@ -391,7 +388,7 @@ end design;
 
 
 
--- trasnlate off
+-- transte off
 
 Library ieee;
 use ieee.std_logic_1164.all;
@@ -413,8 +410,6 @@ architecture testing of test is
  
  type daten2xchange is array (1 to AnzDuts) of std_ulogic_vector(7 downto 0);
  signal frame2slave,frame2top: daten2xchange; 
- 
- --signal startdelay,enddelay: std_ulogic(3 downto 0);
  
  signal spi_clk,spi_ss,spi_mosi,spi_miso: std_ulogic_vector(1 to AnzDuts);
  
@@ -611,4 +606,4 @@ end generate;
 
 end slave_spi_design; 
 
--- trasnlate on
+-- translate on
