@@ -23,82 +23,82 @@ to the bus transaction trasnmitting the command.
 The supported instruction are:
 
 -------------------------------------- SPI Flash supported Instructions -----------------------------------------
-	Instructions	  		|		Length			|							Description						|		
-							|						|													  		|
-	   Write Enable:		|		1 byte			|   This insctruction set the WEL bit of the Status 		|
-		  (WREN)		  	|						|   Register Flash contains. This bit is to be set prior 	|
-							|						|   each intruction which modifies the flash devices or 	|
-							|						|   writes its Status Register. 							|
-							|						|	These are the instrunctions: PP,SE,BE and WRSR			|
-							|						|	No Frame is recquired from the M25P16, therefore the	|
-							|						|	byte received from the slave during this transaction 	|
-							|						|	is to be ignored.										|
-							|						|	 														|
-	   Write Disable:		|						|	Resets the Write Enable Latch (WEL) bit.				|									
-		  (WRDI)   			|		1 byte			|	No Frame is recquired from the M25P16, therefore the 	|
-							|  	  no response		|	byte received from the slave during this transaction	|
-							|						|	is to be ignored.										|
-							|						|															|
-							|						|															|
-   Read Identification:		|		1 byte			|	To read the manufacturer identication followed by 2		|
-	      (RDID)			| 	3 Bytes response	|	bytes of device information.							|
-							| 						|															|
-							|						|															|
-							|						|															|
-							|						|															|
-							|						|															|															
+    Instructions	  	|		Length				|			Description						|		
+				|						|													  		|
+   Write Enable:		|		1 byte				|   	This insctruction set the WEL bit of the Status 		|
+       (WREN)			|						|   	Register Flash contains. This bit is to be set prior 	|
+				|						|  	 each intruction which modifies the flash devices or 	|
+				|						|   	writes its Status Register. 							|
+				|						|	These are the instrunctions: PP,SE,BE and WRSR			|
+				|						|	No Frame is recquired from the M25P16, therefore the	|
+				|						|	byte received from the slave during this transaction 	|
+				|						|	is to be ignored.										|
+				|						|	 														|
+  Write Disable:		|						|	Resets the Write Enable Latch (WEL) bit.				|									
+       (WRDI)		   	|		1 byte				|	No Frame is recquired from the M25P16, therefore the 	|
+				|  	  no response				|	byte received from the slave during this transaction	|
+				|						|	is to be ignored.										|
+				|						|															|
+				|						|															|
+ Read Identification:		|		1 byte				|	To read the manufacturer identication followed by 2		|
+        (RDID)			| 	3 Bytes response			|	bytes of device information.							|
+				| 						|															|
+				|						|															|
+				|						|															|
+				|						|															|
+				|						|															|															
   Read Status Register:		|		1 byte			|	To read the status register at any time even while a	|
-	    (RDSR)				|	1 byte response		|	PP,SE,BE or WRSR cycle is in progress. Also this com-	|
-							|						|	mand may be send continously. This make possible shor-	|
-							|						|	tening the latency when a command with long execution	|
-							|						|	is in progressy. polling the status register bit WIP	|
-							|						|	help to insure if the insctruction execution is termi-	|
-							|						|	nated before the Data sheet recommanded latency.		|
-							|						|															|
-							|						|															|
-   Write Status Register:	|	  2 bytes long		|	Writes the Status register when neither Hardware or 	|
-		  (WRSR)			|	  1 byte cmd ID		|	Software protection is active. It has to precede from	|
-							|	  1 Data Byte		|	a WREN instruction. WEL Bit(Bit 1),WIP Bit(Bit 0),bit 5	|
-							|	  no response		|	and	bit 6 of the Status Register can not be written by	|
-							|						|	this instruction. This instruction is exectuted if and 	|
-							|						|	only if the total duration of the active phase of SS is	|
-							|						|	a multiple of 8 pulse and terminate directly after the	|
-							|						|	last bit of the second byte has been being latched in.	|
-							|						|															|
-							|						|															|
-	   Read Data Bytes:		|	  4 bytes long 		|	After the last adress byte has been latched in on 		|
-		   (READ)			| 	  1 byte cmd ID		|	M25P16 the Data adressed are shifted out bytewise with	|
-							| 	  3 bytes adr		|	automaticaly adress increment at a max Bit freq fr.		|
-							|  response delimited	|	SlaveSelect going high stopps the M25P16.				|
-							|  by SlaveSelcet going	|															|
-							|	high				|															|
-							|						|															|
-							|						|															|
-							|						|															|
-							|						|															|
-							|						|															|
-							|						|															|
-							|						|															|
-							|						|															|
-							|						|															|
- Read Data at Higher Speed	|	  5 bytes long		|	Apart the max frq at which the bit are shifted out by 	|
-		(FAST_READ)   	  	|	  1 byte cmd ID		|	M25P16 and a mandatory dummy byte after the 3 bytes 	|
-							|	  3 bytes adr		|	adress is this cmd  identical to the cmd READ			|
-							|  response delimited	|														  	|
-							|  by SlaveSelcet going	|															|
-							|  high					|															|
-							|						|															|
-							|						|															|
-							|						|															|
-							|						|															|
-							|						|															|
-							|						|															|
-							|						|															|
-							|						|															|
-							|						|															|
-							|						|															|
-		Page Program		|1 byte insctruction ID	|	allows bytes to be programmed in the memory(changing	| 
-		     (PP)			|	3 bytes adresses	|	from 1 to 0). Before it can be accepted, a WREN In-		|
+	    (RDSR)		|	1 byte response		|	PP,SE,BE or WRSR cycle is in progress. Also this com-	|
+				|						|	mand may be send continously. This make possible shor-	|
+				|						|	tening the latency when a command with long execution	|
+				|						|	is in progressy. polling the status register bit WIP	|
+				|						|	help to insure if the insctruction execution is termi-	|
+				|						|	nated before the Data sheet recommanded latency.		|
+				|						|															|
+					|						|															|
+   Write Status Register:		|	  2 bytes long		|	Writes the Status register when neither Hardware or 	|
+		  (WRSR)		|	  1 byte cmd ID		|	Software protection is active. It has to precede from	|
+					|	  1 Data Byte		|	a WREN instruction. WEL Bit(Bit 1),WIP Bit(Bit 0),bit 5	|
+					|	  no response		|	and	bit 6 of the Status Register can not be written by	|
+					|						|	this instruction. This instruction is exectuted if and 	|
+					|						|	only if the total duration of the active phase of SS is	|
+					|						|	a multiple of 8 pulse and terminate directly after the	|
+					|						|	last bit of the second byte has been being latched in.	|
+					|						|															|
+					|						|															|
+	Read Data Bytes:		|	  4 bytes long 		|	After the last adress byte has been latched in on 		|
+	(READ)		| 	  1 byte cmd ID		|	M25P16 the Data adressed are shifted out bytewise with	|
+					| 	  3 bytes adr		|	automaticaly adress increment at a max Bit freq fr.		|
+					|  response delimited	|	SlaveSelect going high stopps the M25P16.				|
+					|  by SlaveSelcet going	|															|
+					|	high				|															|
+					|						|															|
+					|						|															|
+					|						|															|
+					|						|															|
+					|						|															|
+					|						|															|
+					|						|															|
+					|						|															|
+					|						|															|
+ Read Data at Higher Speed		|	  5 bytes long		|	Apart the max frq at which the bit are shifted out by 	|
+	(FAST_READ)   	  	|	  1 byte cmd ID		|	M25P16 and a mandatory dummy byte after the 3 bytes 	|
+					|	  3 bytes adr		|	adress is this cmd  identical to the cmd READ			|
+					|  response delimited	|														  	|
+					|  by SlaveSelcet going	|															|
+					|  high					|															|
+					|						|															|
+					|						|															|
+					|						|															|
+					|						|															|
+					|						|															|
+					|						|															|
+					|						|															|
+					|						|															|
+					|						|															|
+					|						|															|
+		Page Program				|1 byte insctruction ID	|	allows bytes to be programmed in the memory(changing	| 
+		     (PP)				|	3 bytes adresses	|	from 1 to 0). Before it can be accepted, a WREN In-		|
 							| at least 1 byte data	|	truction must previously have been executed. If the 8	|
 							| and at most 256 bytes	|   least  significant adr bits(A7-A0) are not all 0, all	|
 							|	No response			|	transmitted data that goes beyond the end of the cur-	|
@@ -117,8 +117,8 @@ The supported instruction are:
 							|						|															|
 							|						|															|
 							|						|				  											|
- 		Sector Erase:		|	  4 bytes long		|	The Sector Erase (SE) instruction sets to 1 (FFh) all	|
-			(SE)   	  		|	  1 byte cmd ID		|	inside the chosen sector. Before it can be	accepted, a	|
+ 		Sector Erase:				|	  4 bytes long		|	The Sector Erase (SE) instruction sets to 1 (FFh) all	|
+			(SE)   	  			|	  1 byte cmd ID		|	inside the chosen sector. Before it can be	accepted, a	|
 							|	  3 bytes adr		|	Write Enable (WREN) instruction must previously have	|
 							|						|	been executed. After the Write Enable (WREN) cmd has 	|
 							|						|	been decoded, the devices sets the Write Enable latch	|
@@ -129,8 +129,8 @@ The supported instruction are:
 							|						|															|
 							|						|															|
 							|						|															|
- 		Bulk Erase:		   	|	  1 byte cmd ID		|	Sets all Bits to 1(FFh). WEN cmd should had been exe-	|
-			(BE)			|	   No response		|	cuted for this cmd to be accepeted.						|
+ 		Bulk Erase:		   		|	  1 byte cmd ID		|	Sets all Bits to 1(FFh). WEN cmd should had been exe-	|
+			(BE)				|	   No response		|	cuted for this cmd to be accepeted.						|
 							|						|															|
 							|						|	This instruction is exectuted if and only if the total	|
 							|						|	duration of the active phase of SS is a multiple of 8	|
@@ -140,8 +140,8 @@ The supported instruction are:
 							|						|															|
 							|						|															|
 							|						|															|
-		Deep Power Down:   	|	  1 byte cmd ID		|	Put the device in the lowest consumption mode (Deep		|
-		(DP)				|	    No response		|	Power Mode) thus reducing the Device Power consumption.	|
+		Deep Power Down:   			|	  1 byte cmd ID		|	Put the device in the lowest consumption mode (Deep		|
+		(DP)					|	    No response		|	Power Mode) thus reducing the Device Power consumption.	|
 							|						|	This instruction is exectuted if and only if the total	|
 							|						|	duration of the active phase of SS is a multiple of 8	|
 							|						|	pulses and terminate directly after the last bit of the	|
@@ -150,14 +150,14 @@ The supported instruction are:
 							|						|															|
 							|						|															|
 							|						|															|
-	Release from Deep	  	|	  5 Bytes long		|	Once the device has entered the Deep Powerdown mode, 	|
-	Power Down and Read		|	1 byte Instruction	|	all instructions are ignored except the	Release from	|				
-	Electronic Signature: 	|	3 Dummy Bytes		|	Deep Power-down and Read Electronic Signatuere (RES)	|
-	   (RES)				| 1 byte Electronic	Si-	|	instruction. Executing this command takes teh device 	|
+	Release from Deep	  			|	  5 Bytes long		|	Once the device has entered the Deep Powerdown mode, 	|
+	Power Down and Read				|	1 byte Instruction	|	all instructions are ignored except the	Release from	|				
+	Electronic Signature: 				|	3 Dummy Bytes		|	Deep Power-down and Read Electronic Signatuere (RES)	|
+	   (RES)					| 1 byte Electronic	Si-	|	instruction. Executing this command takes teh device 	|
 							| gnature as response.	|	out of the Deep Power-Down mode.						|
 							|						|				  											|
 							|						|													  		|
-							|						|															|
+						|						|															|
 */
 
 
